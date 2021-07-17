@@ -379,64 +379,84 @@ _SRS_Kicks_JLSTZ=(((0,0),(0,0),(0,0),(0,0)), #No kick
                   ((0,0),(1,2),(0,0),(-1,2))) #Kick 4
 _SRS_Shapes_T=[None]*4
 _SRS_Shapes_T[0]=Pixel2DSet.from_string(" # ",
-                                        "#@#")
+                                        "#@#",
+                                        fill=Block(source="T"))
 _SRS_Shapes_T[1]=Pixel2DSet.from_string("# ",
                                         "@#",
-                                        "# ")
+                                        "# ",
+                                        fill=Block(source="T"))
 _SRS_Shapes_T[2]=Pixel2DSet.from_string("#@#",
-                                        " # ")
+                                        " # ",
+                                        fill=Block(source="T"))
 _SRS_Shapes_T[3]=Pixel2DSet.from_string(" #",
                                         "#@",
-                                        " #")
+                                        " #",
+                                        fill=Block(source="T"))
 
 
 _SRS_Shapes_L=[None]*4
 _SRS_Shapes_L[0]=Pixel2DSet.from_string("  #",
-                                        "#@#")
+                                        "#@#",
+                                        fill=Block(source="L"))
 _SRS_Shapes_L[1]=Pixel2DSet.from_string("# ",
                                         "@ ",
-                                        "##")
+                                        "##",
+                                        fill=Block(source="L"))
 _SRS_Shapes_L[2]=Pixel2DSet.from_string("#@#",
-                                        "#  ")
+                                        "#  ",
+                                        fill=Block(source="L"))
 _SRS_Shapes_L[3]=Pixel2DSet.from_string("##",
                                         " @",
-                                        " #")
+                                        " #",
+                                        fill=Block(source="L"))
 
 _SRS_Shapes_J=[None]*4
 _SRS_Shapes_J[0]=Pixel2DSet.from_string("#  ",
-                                        "#@#")
+                                        "#@#",
+                                        fill=Block(source="J"))
 _SRS_Shapes_J[1]=Pixel2DSet.from_string("##",
                                         "@ ",
-                                        "# ")
+                                        "# ",
+                                        fill=Block(source="J"))
 _SRS_Shapes_J[2]=Pixel2DSet.from_string("#@#",
-                                        "  #")
+                                        "  #",
+                                        fill=Block(source="J"))
 _SRS_Shapes_J[3]=Pixel2DSet.from_string(" #",
                                         " @",
-                                        "##")
+                                        "##",
+                                        fill=Block(source="J"))
 
 _SRS_Shapes_S=[None]*4
 _SRS_Shapes_S[0]=Pixel2DSet.from_string(" ##",
-                                        "#@ ")
+                                        "#@ ",
+                                        fill=Block(source="S"))
 _SRS_Shapes_S[1]=Pixel2DSet.from_string("# ",
                                         "@#",
-                                        " #")
+                                        " #",
+                                        fill=Block(source="S"))
 _SRS_Shapes_S[2]=Pixel2DSet.from_string(" @#",
-                                        "## ")
+                                        "## ",
+                                        fill=Block(source="S"))
 _SRS_Shapes_S[3]=Pixel2DSet.from_string("# ",
                                         "#@",
-                                        " #")
+                                        " #",
+                                        fill=Block(source="S"))
 
 _SRS_Shapes_Z=[None]*4
 _SRS_Shapes_Z[0]=Pixel2DSet.from_string("## ",
-                                        " @#")
+                                        " @#",
+                                        fill=Block(source="Z"))
 _SRS_Shapes_Z[1]=Pixel2DSet.from_string(" #",
                                         "@#",
-                                        "# ")
+                                        "# ",
+                                        fill=Block(source="Z"))
 _SRS_Shapes_Z[2]=Pixel2DSet.from_string("#@ ",
-                                        " ##")
+                                        " ##",
+                                        fill=Block(source="Z"))
 _SRS_Shapes_Z[3]=Pixel2DSet.from_string(" #",
                                         "#@",
-                                        "# ")
+                                        "# ",
+                                        fill=Block(source="Z"))
 
 _SRS_Kicks_I=(((0,0),(-1,0),(-1,1),(0,1)), #No kick
               ((-1,0),(0,0),(1,1),(0,1)), #Kick 1
@@ -445,27 +465,35 @@ _SRS_Kicks_I=(((0,0),(-1,0),(-1,1),(0,1)), #No kick
                ((2,0),(0,-2),(-2,0),(0,2))) #Kick 4
 
 _SRS_Shapes_I=[None]*4
-_SRS_Shapes_I[0]=Pixel2DSet.from_string("#@##")
+_SRS_Shapes_I[0]=Pixel2DSet.from_string("#@##",
+                                        fill=Block(source="I"))
 _SRS_Shapes_I[1]=Pixel2DSet.from_string("#",
                                         "@",
                                         "#",
-                                        "#")
-_SRS_Shapes_I[2]=Pixel2DSet.from_string("##@#")
+                                        "#",
+                                        fill=Block(source="I"))
+_SRS_Shapes_I[2]=Pixel2DSet.from_string("##@#",
+                                        fill=Block(source="I"))
 _SRS_Shapes_I[3]=Pixel2DSet.from_string("#",
                                         "#",
                                         "@",
-                                        "#")
+                                        "#",
+                                        fill=Block(source="I"))
 
 _SRS_Kicks_O=(((0,0),(0,-1),(-1,-1),(-1,0)),) #No kick
 _SRS_Shapes_O=[None]*4
 _SRS_Shapes_O[0]=Pixel2DSet.from_string("##",
-                                        "@#")
+                                        "@#",
+                                        fill=Block(source="O"))
 _SRS_Shapes_O[1]=Pixel2DSet.from_string("@#",
-                                        "##")
+                                        "##",
+                                        fill=Block(source="O"))
 _SRS_Shapes_O[2]=Pixel2DSet.from_string("#@",
-                                        "##")
+                                        "##",
+                                        fill=Block(source="O"))
 _SRS_Shapes_O[3]=Pixel2DSet.from_string("##",
-                                        "#@")
+                                        "#@",
+                                        fill=Block(source="O"))
 
 
 class SRS_J(SRS_Tetrimino):
@@ -704,6 +732,16 @@ class CurseYou:
     def getkey():
         pass
 
+colormap={
+    "S":(curses.COLOR_GREEN,+1),
+    "Z":(curses.COLOR_RED,0),
+    "T":(curses.COLOR_MAGENTA,+1),
+    "O":(curses.COLOR_YELLOW,+1),
+    "I":(curses.COLOR_CYAN,0),
+    "J":(curses.COLOR_BLUE,-1),
+    "L":(curses.COLOR_YELLOW,-1),
+    "X":(curses.COLOR_WHITE,0)
+    }
 def main(stdscr):
     stdscr.nodelay(True)
     cy=CurseYou(stdscr)
@@ -775,10 +813,23 @@ def main(stdscr):
         r2d=pf.get_matrix_state()
         #stdscr.clear()
         for x,y in r2d:
-            cy.add(x,r2d.y-y,
-                [" ","%"][r2d[x,y].solid],
-                curses.COLOR_RED,curses.COLOR_WHITE,
-                curses.A_BLINK)
+            block=r2d[x,y]
+            if not block.solid:
+                color=curses.COLOR_BLACK
+                mod=0
+            else:
+                color=colormap[block.source][0]
+                mod=colormap[block.source][1]
+            attr=0
+            if mod==+1:
+                attr |= curses.A_BOLD
+            elif mod==-1:
+                attr |= curses.A_DIM
+            cy.add(x*2,r2d.y-y,
+                "  ",
+                curses.COLOR_BLACK,color,attr
+                )
+
 
 
 
