@@ -29,15 +29,22 @@ class Block():
     Class representing a single block in the matrix.
     Immutable.
     '''
-    def __init__(self,solid=True,source="X"):
+    def __init__(self,solid=True,source="X",ghost=False):
         self._solid=solid
         self._source=source
+        self._spook=ghost
     @property
     def solid(self):
         return self._solid
     @property
     def source(self):
         return self._source
+    @property
+    def ghost(self):
+        return self._spook
+
+    def ghostify(self):
+        return Block(self.solid,self.source,True)
 
     def __repr__(self):
         return F"Block(solid={self.solid},source={self.source})"
@@ -67,7 +74,11 @@ class Pixel2DSet():
             res._pixels[nc]=self._pixels[oc]
         return res
     
-
+    def make_ghost(self):
+        res = Pixel2DSet()
+        for coords in self:
+            res._pixels[coords]=self._pixels[coords].ghostify()
+        return res
 
     @classmethod
     def from_dict(cls,d):
@@ -296,7 +307,9 @@ class Tetrimino():
             if r2d[bcoords].solid==True:
                 return True
         return False
-        
+
+    def copy(self):
+        return copy.copy(self)
     def _try_move(self,delta_x,delta_y):
         temp_mino=copy.copy(self)
         temp_mino._translate(delta_x,delta_y)
@@ -331,8 +344,7 @@ class Tetrimino():
 
     def _matrix_state(self):
         return OOBFilledRaster2D(
-                    self._playfield.get_matrix_state(
-                        player_filter= lambda player: not (player is self))
+                    self._playfield.get_matrix_state()
                     ,oob=Block(solid=True))
     
     def input(self,
@@ -593,11 +605,22 @@ class Playfield():
     def add_activemino(self,mino):
         self._active_minos.append(mino)
 
-    def get_matrix_state(self,*,player_filter=(lambda x:True)):
+    def get_matrix_state(self,*,player_filter=(lambda x:True),
+                         generate_ghost=False,
+                         include_active=False):
         r2d=self._matrix
-        for i in  self._active_minos:
-            if player_filter(i):
-                r2d=r2d.composite_p2ds(i.get_blocks())
+        if include_active:
+            for i in  self._active_minos:
+                if player_filter(i):
+
+                    if generate_ghost:
+                        ghost=i.copy()
+                        ghost.firm_drop()
+                        ghostblocks=ghost.get_blocks().make_ghost()
+                        r2d=r2d.composite_p2ds(ghostblocks)
+                    minoblocks=i.get_blocks()
+                    r2d=r2d.composite_p2ds(minoblocks)
+
         return r2d
         
     def update_matrix(self,newmat):
@@ -810,7 +833,8 @@ def main(stdscr):
         elif inp=="E":
             mino.input(rotate_r=True)
 
-        r2d=pf.get_matrix_state()
+        r2d=pf.get_matrix_state(generate_ghost=True,
+                                include_active=True)
         #stdscr.clear()
         for x,y in r2d:
             block=r2d[x,y]
@@ -825,10 +849,17 @@ def main(stdscr):
                 attr |= curses.A_BOLD
             elif mod==-1:
                 attr |= curses.A_DIM
-            cy.add(x*2,r2d.y-y,
-                "  ",
-                curses.COLOR_BLACK,color,attr
-                )
+
+            if block.ghost:
+                cy.add(x*2,r2d.y-y,
+                    "--",
+                    color,curses.COLOR_BLACK,attr
+                    )
+            else:
+                cy.add(x*2,r2d.y-y,
+                    "  ",
+                    curses.COLOR_BLACK,color,attr
+                    )
 
 
 
