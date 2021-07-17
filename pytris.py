@@ -828,9 +828,9 @@ def main(stdscr):
             mino.input(hard=True)
         elif inp=="S":
             mino.input(soft=True)
-        elif inp=="Q":
+        elif inp=="O":
             mino.input(rotate_l=True)
-        elif inp=="E":
+        elif inp=="P":
             mino.input(rotate_r=True)
 
         r2d=pf.get_matrix_state(generate_ghost=True,
