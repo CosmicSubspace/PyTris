@@ -1,6 +1,8 @@
 import random
 import enum
 import copy
+import curses
+import time
 
 class Tuples:
     @classmethod
@@ -20,6 +22,7 @@ class Tuples:
         if len(a)!=len(b):
             raise Exception("Mismatched tuple length")
         return tuple((f(a[i],b[i]) for i in range(len(a))))
+
 
 class Block():
     '''
@@ -64,6 +67,7 @@ class Pixel2DSet():
             res._pixels[nc]=self._pixels[oc]
         return res
     
+
 
     @classmethod
     def from_dict(cls,d):
@@ -631,26 +635,31 @@ class Playfield():
         self._matrix=r2d
 
 
-class PyTrisTextRenderer():
+
+
+
+def r2d_render_stdout(self, r2d):
     def _b2t(self,block):
         if block.solid:
             return block.source[0].upper()
         else:
             return " "
-    def render(self, r2d):
-        res=''
-        res+="+"+"-"*r2d.x+"+"+"\n"
-        for y in range(r2d.y):
-            iy=r2d.y-y-1
-            res+="|"
-            for x in range(r2d.x):
-                coords=(x,iy)
-                block=r2d[coords]
-                res+=self._b2t(block)
-            res+="|"
-            res+="\n"
-        res+="+"+"-"*r2d.x+"+"
-        print(res)
+    res=''
+    res+="+"+"-"*r2d.x+"+"+"\n"
+    for y in range(r2d.y):
+        iy=r2d.y-y-1
+        res+="|"
+        for x in range(r2d.x):
+            coords=(x,iy)
+            block=r2d[coords]
+            res+=self._b2t(block)
+        res+="|"
+        res+="\n"
+    res+="+"+"-"*r2d.x+"+"
+    print(res)
+
+def r2d_render_curses(self, r2d, scr, x, y):
+    pass
 
 _test_DT_cannon_p2ds=Pixel2DSet.from_string(
     "  ##      ",
@@ -664,18 +673,52 @@ _test_DT_cannon_p2ds=Pixel2DSet.from_string(
 _test_DT_cannon_r2d=Raster2D.blank_fill(10,20,Block(solid=False)).composite_p2ds(_test_DT_cannon_p2ds.translate(0,0))
 
 
-def main():
+class TextOutOfBounds(BaseException):
+    pass
+
+class CurseYou:
+    '''
+    Thin wrapper around curses module...
+    '''
+    def __init__(self,scr):
+        self._colorpairs={}
+        self._colorpair_next_index=1
+        self._scr=scr
+    def add(self,x,y,s,fg,bg,*attrs):
+        xmax=curses.COLS-1
+        ymax=curses.LINES-1
+        if x<0 or x>xmax or y<0 or y>ymax:
+            raise TextOutOfBounds
+
+        if (fg,bg) not in self._colorpairs:
+            curses.init_pair(self._colorpair_next_index,fg,bg)
+            self._colorpairs[(fg,bg)]=self._colorpair_next_index
+            self._colorpair_next_index+=1
+
+        attr_bitfield=curses.color_pair(self._colorpairs[(fg,bg)])
+        for attr in attrs:
+            attr_bitfield=attr_bitfield | attr
+        self._scr.addstr(y,x,s,attr_bitfield)
+    def commit(self):
+        self._scr.refresh()
+    def getkey():
+        pass
+
+def main(stdscr):
+    stdscr.nodelay(True)
+    cy=CurseYou(stdscr)
+
     sbr=SevenBagRandomizer
     pf=Playfield(10,20)
-    pttr=PyTrisTextRenderer()
 
     pf.force_matrix_state(_test_DT_cannon_r2d)
 
     mino=SRS_T((5,15),0,pf)
+    '''
     while True:
         if mino.dead:
             mino=sbr.generate_next()((5,17),0,pf)
-        
+
         pttr.render(pf.get_matrix_state())
 
         inp=input()
@@ -691,9 +734,63 @@ def main():
             mino.input(rotate_l=True)
         elif inp=="e":
             mino.input(rotate_r=True)
-    
+            '''
+
+    target_fps=20
+    target_spf=1/target_fps
+    last_frame_time=0
+    while True: # UI loop
+        t=time.time()
+        target_frametime=last_frame_time+target_spf
+        waittime=target_frametime-t
+        if waittime<=0:
+            pass
+        elif waittime>target_spf:
+            time.sleep(target_spf)
+        else:
+            time.sleep(waittime)
+
+        try:
+            inp=stdscr.getkey().upper()
+        except:
+            inp=None
+
+
+        if mino.dead:
+            mino=sbr.generate_next()((5,17),0,pf)
+
+        if inp=="A":
+            mino.input(left=True)
+        elif inp=="D":
+            mino.input(right=True)
+        elif inp=="W":
+            mino.input(hard=True)
+        elif inp=="S":
+            mino.input(soft=True)
+        elif inp=="Q":
+            mino.input(rotate_l=True)
+        elif inp=="E":
+            mino.input(rotate_r=True)
+
+        r2d=pf.get_matrix_state()
+        #stdscr.clear()
+        for x,y in r2d:
+            cy.add(x,r2d.y-y,
+                [" ","%"][r2d[x,y].solid],
+                curses.COLOR_RED,curses.COLOR_WHITE,
+                curses.A_BLINK)
+
+
+
+
+
+
+        cy.commit()
+
+
+
 if __name__=="__main__":
-    main()
+    curses.wrapper(main)
 
 
 
