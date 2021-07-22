@@ -600,10 +600,20 @@ class Playfield():
         self._dim_y=dim_y
         self._matrix=Raster2D.blank_fill(dim_x,dim_y,Block(solid=False))
         self._active_minos=list()
+
         
 
     def add_activemino(self,mino):
         self._active_minos.append(mino)
+        assert len(self._active_minos) <=1
+
+    def get_activemino(self):
+        if not self._active_minos:
+            return None
+        return self._active_minos[0]
+
+    def remove_activemino(self):
+        return self._active_minos.pop()
 
     def get_matrix_state(self,*,player_filter=(lambda x:True),
                          generate_ghost=False,
@@ -625,8 +635,9 @@ class Playfield():
         
     def update_matrix(self,newmat):
         self._matrix=newmat
-    def gravity(self):
-        pass
+    def gravity(self,n):
+        for am in self._active_minos:
+            am.gravity(n)
 
     def line_clear(self,y):
         lower=self._matrix.crop((0,0,self._dim_x-1,y-1))
@@ -686,6 +697,99 @@ class Playfield():
         self._matrix=r2d
 
 
+class Key(enum.Enum):
+    MOVE_LEFT=11
+    MOVE_RIGHT=12
+
+    ROTATE_LEFT=21
+    ROTATE_RIGHT=22
+    ROTATE_180=23
+
+    HOLD=31
+
+    DROP_HARD=41
+    DROP_FIRM=42
+    DROP_SOFT=43
+
+    KEY_DOWN=101
+    KEY_UP=102
+
+
+class TetrisGame:
+    def __init__(self,t):
+        self._gravity=1.5 #Blocks per second
+        self._last_gravity=t
+        self._held_mino=None
+        self._hold_avail=True
+        self.sbr=SevenBagRandomizer
+        self.pf=Playfield(10,20)
+
+        self.pf.force_matrix_state(_test_DT_cannon_r2d)
+
+        self._last_updated_t=t
+
+    def set_gravity(self,g):
+        self._gravity=g*60 #Blocks per 60fps frame
+
+    def key(self,t,ktype,etype=Key.KEY_DOWN):
+        if ktype==Key.MOVE_LEFT:
+            self.pf.get_activemino().input(left=True)
+        elif ktype==Key.MOVE_RIGHT:
+            self.pf.get_activemino().input(right=True)
+        elif ktype==Key.DROP_HARD:
+            self.pf.get_activemino().input(hard=True)
+        elif ktype==Key.DROP_FIRM:
+            self.pf.get_activemino().input(soft=True)
+        elif ktype==Key.ROTATE_LEFT:
+            self.pf.get_activemino().input(rotate_l=True)
+        elif ktype==Key.ROTATE_RIGHT:
+            self.pf.get_activemino().input(rotate_r=True)
+
+    def update(self,t):
+        delta_t=t-self._last_updated_t
+        if delta_t>60: #system time changed?
+            delta_t=1
+        if delta_t<=0:
+            delta_t=0.0000001 #faisafe
+        self._last_updated_t=t
+
+        bps=self._gravity #blocks per second
+        spb=1/bps
+
+
+
+        if (self.pf.get_activemino() is None) or self.pf.get_activemino().dead:
+            self.new_mino()
+
+        down=0
+        while t>self._last_gravity+spb:
+            self._last_gravity+=spb
+            down+=1
+        if down>0:
+            self.pf.get_activemino().gravity(down)
+
+
+
+    def hold(self):
+        if not self._hold_avail:
+            return False
+
+        mino=self.pf.get_activemino()
+        self.new_mino()
+
+
+    def new_mino(self):
+        mino=self.sbr.generate_next()((5,17),0,self.pf)
+        self.pf.remove_activemino()
+        self.pf.add_activemino(mino)
+
+    def get_matrix_r2d(self):
+        return self.pf.get_matrix_state(generate_ghost=True,
+                                include_active=True)
+    def get_held(self):
+        pass
+    def get_nextqueue(self,n=5):
+        pass
 
 
 
@@ -769,33 +873,7 @@ def main(stdscr):
     stdscr.nodelay(True)
     cy=CurseYou(stdscr)
 
-    sbr=SevenBagRandomizer
-    pf=Playfield(10,20)
-
-    pf.force_matrix_state(_test_DT_cannon_r2d)
-
-    mino=SRS_T((5,15),0,pf)
-    '''
-    while True:
-        if mino.dead:
-            mino=sbr.generate_next()((5,17),0,pf)
-
-        pttr.render(pf.get_matrix_state())
-
-        inp=input()
-        if inp=="a":
-            mino.input(left=True)
-        elif inp=="d":
-            mino.input(right=True)
-        elif inp=="w":
-            mino.input(hard=True)
-        elif inp=="s":
-            mino.input(soft=True)
-        elif inp=="q":
-            mino.input(rotate_l=True)
-        elif inp=="e":
-            mino.input(rotate_r=True)
-            '''
+    tg=TetrisGame(time.time())
 
     target_fps=20
     target_spf=1/target_fps
@@ -817,24 +895,21 @@ def main(stdscr):
             inp=None
 
 
-        if mino.dead:
-            mino=sbr.generate_next()((5,17),0,pf)
-
         if inp=="A":
-            mino.input(left=True)
+            tg.key(t,Key.MOVE_LEFT)
         elif inp=="D":
-            mino.input(right=True)
+            tg.key(t,Key.MOVE_RIGHT)
         elif inp=="W":
-            mino.input(hard=True)
+            tg.key(t,Key.DROP_HARD)
         elif inp=="S":
-            mino.input(soft=True)
+            tg.key(t,Key.DROP_FIRM)
         elif inp=="O":
-            mino.input(rotate_l=True)
+            tg.key(t,Key.ROTATE_LEFT)
         elif inp=="P":
-            mino.input(rotate_r=True)
+            tg.key(t,Key.ROTATE_RIGHT)
+        tg.update(t)
 
-        r2d=pf.get_matrix_state(generate_ghost=True,
-                                include_active=True)
+        r2d=tg.get_matrix_r2d()
         #stdscr.clear()
         for x,y in r2d:
             block=r2d[x,y]
