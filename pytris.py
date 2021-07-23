@@ -244,7 +244,9 @@ class Tetrimino():
         self._rotation=rotation
         self._playfield=playfield
         self._playfield.add_activemino(self)
-        self._lockdown_timer_start=playfield.get_game_time()
+
+        self._last_movement=None
+
         self._gravity_remainder=0
         self._dead=False
 
@@ -278,7 +280,7 @@ class Tetrimino():
         raise NotImplementedError
 
     
-    def _rotate(self,rot,r2d):
+    def _rotate(self,rot,r2d,t):
         if not(rot==1 or rot==-1):
             raise Exception("Invalid rotation delta!")
         
@@ -298,6 +300,7 @@ class Tetrimino():
                 #test pass!
                 self._coords=temp2_mino._coords
                 self._rotation=temp2_mino._rotation
+                self._update_movement(t)
                 break
     
 
@@ -310,7 +313,7 @@ class Tetrimino():
 
     def copy(self):
         return copy.copy(self)
-    def _try_move(self,delta_x,delta_y):
+    def _try_move(self,delta_x,delta_y,t):
         temp_mino=copy.copy(self)
         temp_mino._translate(delta_x,delta_y)
         blocks=temp_mino.get_blocks()
@@ -322,48 +325,55 @@ class Tetrimino():
  
         #Can go
         self._coords=temp_mino._coords
+        self._update_movement(t)
         return True
-
-    def firm_drop(self):
-        while self._try_move(0,-1):
+    def _update_movement(self,t):
+        self._last_movement=t
+    def time_since_last_movement(self,t):
+        if self._last_movement is None:
+            return None
+        return t-self._last_movement
+    def firm_drop(self,t):
+        while self._try_move(0,-1,t):
             pass
     
-    def hard_drop(self):
-        self.firm_drop()
+    def lock(self):
         self._playfield.lock_mino(self)
+
+    def hard_drop(self,t):
+        self.firm_drop(t)
+        self.lock()
         
     
-    def gravity(self,n):
-        move_success=self._try_move(0,-1)
+    def gravity(self,n,t):
+        move_success=self._try_move(0,-1,t)
         
         if move_success:
-            self._lockdown_timer_start=self._playfield.get_game_time()
-
-        if n>1:
-            self._gravity(n-1)
+            if n>1:
+                self._gravity(n-1,t)
 
     def _matrix_state(self):
         return OOBFilledRaster2D(
                     self._playfield.get_matrix_state()
                     ,oob=Block(solid=True))
     
-    def input(self,
+    def input(self,t,
               rotate_r=False,rotate_l=False,
               hard=False,soft=False,left=False,right=False):
         matrix_state=self._matrix_state()
         if rotate_r:
-            self._rotate(+1,matrix_state)
+            self._rotate(+1,matrix_state,t)
         elif rotate_l:
-            self._rotate(-1,matrix_state)
+            self._rotate(-1,matrix_state,t)
 
         if hard:
-            self.hard_drop()
+            self.hard_drop(t)
         elif soft:
-            self.firm_drop()#gravity(1)
+            self.firm_drop(t)#gravity(1)
         elif left:
-            self._try_move(-1,0)
+            self._try_move(-1,0,t)
         elif right:
-            self._try_move(+1,0)
+            self._try_move(+1,0,t)
 
         
 # http://harddrop.com/wiki/SRS#How_Guideline_SRS_Really_Works
@@ -625,7 +635,7 @@ class Playfield():
 
                     if generate_ghost:
                         ghost=i.copy()
-                        ghost.firm_drop()
+                        ghost.firm_drop(0)
                         ghostblocks=ghost.get_blocks().make_ghost()
                         r2d=r2d.composite_p2ds(ghostblocks)
                     minoblocks=i.get_blocks()
@@ -669,11 +679,7 @@ class Playfield():
                 break
         return lc
                 
-        
 
-    def get_game_time(self):
-        # seconds
-        pass
 
     def remove_mino(self,mino):
         self._active_minos.remove(mino)
@@ -719,6 +725,7 @@ class TetrisGame:
     def __init__(self,t):
         self._gravity=1.5 #Blocks per second
         self._last_gravity=t
+        self._lockdown_delay=1.0 #second
         self._held_mino=None
         self._hold_avail=True
         self.sbr=SevenBagRandomizer
@@ -733,17 +740,17 @@ class TetrisGame:
 
     def key(self,t,ktype,etype=Key.KEY_DOWN):
         if ktype==Key.MOVE_LEFT:
-            self.pf.get_activemino().input(left=True)
+            self.pf.get_activemino().input(t,left=True)
         elif ktype==Key.MOVE_RIGHT:
-            self.pf.get_activemino().input(right=True)
+            self.pf.get_activemino().input(t,right=True)
         elif ktype==Key.DROP_HARD:
-            self.pf.get_activemino().input(hard=True)
+            self.pf.get_activemino().input(t,hard=True)
         elif ktype==Key.DROP_FIRM:
-            self.pf.get_activemino().input(soft=True)
+            self.pf.get_activemino().input(t,soft=True)
         elif ktype==Key.ROTATE_LEFT:
-            self.pf.get_activemino().input(rotate_l=True)
+            self.pf.get_activemino().input(t,rotate_l=True)
         elif ktype==Key.ROTATE_RIGHT:
-            self.pf.get_activemino().input(rotate_r=True)
+            self.pf.get_activemino().input(t,rotate_r=True)
 
     def update(self,t):
         delta_t=t-self._last_updated_t
@@ -757,16 +764,26 @@ class TetrisGame:
         spb=1/bps
 
 
-
-        if (self.pf.get_activemino() is None) or self.pf.get_activemino().dead:
+        if (self.pf.get_activemino() is None):
             self.new_mino()
+
+        am=self.pf.get_activemino()
+
+        tslm= am.time_since_last_movement(t)
+        if tslm is not None:
+            if tslm>self._lockdown_delay:
+                am.lock()
+
+        if am.dead:
+            self.new_mino()
+
 
         down=0
         while t>self._last_gravity+spb:
             self._last_gravity+=spb
             down+=1
         if down>0:
-            self.pf.get_activemino().gravity(down)
+            self.pf.get_activemino().gravity(down,t)
 
 
 
