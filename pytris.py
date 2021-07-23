@@ -944,13 +944,13 @@ def main(stdscr):
 
             if block.ghost:
                 cy.add(x*2,r2d.y-y,
-                    "--",
+                    "[]",
                     color,curses.COLOR_BLACK,attr
                     )
             else:
                 cy.add(x*2,r2d.y-y,
-                    "  ",
-                    curses.COLOR_BLACK,color,attr
+                    "\u2588"*2, # █
+                    color,curses.COLOR_BLACK,attr
                     )
 
 
