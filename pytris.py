@@ -74,6 +74,21 @@ class Pixel2DSet():
             res._pixels[nc]=self._pixels[oc]
         return res
     
+    def get_boundingbox(self):
+        xmin=+1000
+        xmax=-1000
+        ymin=+1000
+        ymax=-1000
+        for x,y in self:
+            xmin=min(xmin,x)
+            xmax=max(xmax,x)
+            ymin=min(ymin,y)
+            ymax=max(ymax,y)
+        return {
+            "X-":xmin,
+            "X+":xmax,
+            "Y-":ymin,
+            "Y+":ymax}
     def make_ghost(self):
         res = Pixel2DSet()
         for coords in self:
@@ -225,11 +240,16 @@ class BagRandomizer():
         return self
     def __next__(self):
         return self.generate_next()
-    def generate_next(self):
-        if not self.buffer: #empty!
+    def peek(self,n):
+        self._expand_buffer(n)
+        return tuple(self.buffer[:n])
+    def _expand_buffer(self,n):
+        while len(self.buffer)<n:
             l=list(self._minos)
             random.shuffle(l)
             self.buffer+=l
+    def generate_next(self):
+        self._expand_buffer(1)
 
         res=self.buffer[0]
         del self.buffer[0]
@@ -239,16 +259,18 @@ class GameConstants:
     lockdown_delay=0.5
 
 class Tetrimino():
-    def __init__(self, coords, rotation, playfield):
+    def __init__(self, coords, rotation):
         self._coords=coords
         self._rotation=rotation
-        self._playfield=playfield
-        self._playfield.add_activemino(self)
+        self._playfield=None
 
         self._last_movement=None
 
         self._gravity_remainder=0
         self._dead=False
+
+    def link_to_playfield(self,pf):
+        self._playfield=pf
 
     def die(self):
         self._dead=True
@@ -268,7 +290,6 @@ class Tetrimino():
                 return False
         return True
         
-
     def get_blocks(self):
         p2ds=self.shape()
         return p2ds.translate(*self._coords)
@@ -614,6 +635,7 @@ class Playfield():
         
 
     def add_activemino(self,mino):
+        mino.link_to_playfield(self)
         self._active_minos.append(mino)
         assert len(self._active_minos) <=1
 
@@ -796,8 +818,9 @@ class TetrisGame:
 
 
     def new_mino(self):
-        mino=self.sbr.generate_next()((5,17),0,self.pf)
-        self.pf.remove_activemino()
+        mino=self.sbr.generate_next()((5,17),0)
+        if self.pf.get_activemino() is not None:
+            self.pf.remove_activemino()
         self.pf.add_activemino(mino)
 
     def get_matrix_r2d(self):
@@ -806,8 +829,20 @@ class TetrisGame:
     def get_held(self):
         pass
     def get_nextqueue(self,n=5):
-        pass
+        return self.sbr.peek(n)
 
+    def get_nextpreview(self,n):
+        res=[]
+        pieces=self.get_nextqueue(n)
+        for piece_class in pieces:
+            piece=piece_class((0,0),0)
+            p2ds=piece.get_blocks()
+            bbx=p2ds.get_boundingbox()
+            positive_p2ds=p2ds.translate(-bbx["X-"],-bbx["Y-"])
+            r2d=Raster2D.blank_fill(4,4,Block(solid=False))
+            r2d=r2d.composite_p2ds(positive_p2ds)
+            res.append(r2d)
+        return res
 
 
 def r2d_render_stdout(self, r2d):
@@ -875,7 +910,19 @@ class CurseYou:
         self._scr.refresh()
     def getkey():
         pass
-
+    def subscreen(self,xdelta,ydelta):
+        return CYSub(self,xdelta,ydelta)
+class CYSub():
+    def __init__(self,cy,xoff,yoff):
+        self._cy=cy
+        self._xoff=xoff
+        self._yoff=yoff
+    def add(self,x,y,*args,**kwargs):
+        self._cy.add(
+            x+self._xoff,
+            y+self._yoff,
+            *args,**kwargs
+            )
 colormap={
     "S":(curses.COLOR_GREEN,+1),
     "Z":(curses.COLOR_RED,0),
@@ -926,32 +973,43 @@ def main(stdscr):
             tg.key(t,Key.ROTATE_RIGHT)
         tg.update(t)
 
+        cys_matrix=cy.subscreen(0,0)
         r2d=tg.get_matrix_r2d()
         #stdscr.clear()
-        for x,y in r2d:
-            block=r2d[x,y]
-            if not block.solid:
-                color=curses.COLOR_BLACK
-                mod=0
-            else:
-                color=colormap[block.source][0]
-                mod=colormap[block.source][1]
-            attr=0
-            if mod==+1:
-                attr |= curses.A_BOLD
-            elif mod==-1:
-                attr |= curses.A_DIM
+        def draw_r2d_on_cy(cy,r2d):
+            for x,y in r2d:
+                block=r2d[x,y]
+                if not block.solid:
+                    color=curses.COLOR_BLACK
+                    mod=0
+                else:
+                    color=colormap[block.source][0]
+                    mod=colormap[block.source][1]
+                attr=0
+                if mod==+1:
+                    attr |= curses.A_BOLD
+                elif mod==-1:
+                    attr |= curses.A_DIM
 
-            if block.ghost:
-                cy.add(x*2,r2d.y-y,
-                    "[]",
-                    color,curses.COLOR_BLACK,attr
-                    )
-            else:
-                cy.add(x*2,r2d.y-y,
-                    "\u2588"*2, # █
-                    color,curses.COLOR_BLACK,attr
-                    )
+                if block.ghost:
+                    cy.add(x*2,r2d.y-y,
+                        "\u2592"*2,
+                        color,curses.COLOR_BLACK,attr
+                        )
+                else:
+                    cy.add(x*2,r2d.y-y,
+                        "\u2588"*2, # █
+                        color,curses.COLOR_BLACK,attr
+                        )
+        draw_r2d_on_cy(cys_matrix,r2d)
+
+        next_r2ds=tg.get_nextpreview(4)
+        y=0
+        for next_r2d in next_r2ds:
+
+            cys_next=cy.subscreen(24,y)
+            draw_r2d_on_cy(cys_next,next_r2d)
+            y+=5
 
 
 
