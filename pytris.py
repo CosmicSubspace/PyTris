@@ -773,6 +773,8 @@ class TetrisGame:
             self.pf.get_activemino().input(t,rotate_l=True)
         elif ktype==Key.ROTATE_RIGHT:
             self.pf.get_activemino().input(t,rotate_r=True)
+        elif ktype==Key.HOLD:
+            self.hold()
 
     def update(self,t):
         delta_t=t-self._last_updated_t
@@ -788,6 +790,7 @@ class TetrisGame:
 
         if (self.pf.get_activemino() is None):
             self.new_mino()
+            self._hold_avail=True
 
         am=self.pf.get_activemino()
 
@@ -798,6 +801,7 @@ class TetrisGame:
 
         if am.dead:
             self.new_mino()
+            self._hold_avail=True
 
 
         down=0
@@ -813,12 +817,19 @@ class TetrisGame:
         if not self._hold_avail:
             return False
 
-        mino=self.pf.get_activemino()
-        self.new_mino()
+        current_mino=self.pf.get_activemino()
+        self.new_mino(self._held_mino)
+        self._hold_avail=False
+        self._held_mino=type(current_mino) # probably bad design
 
 
-    def new_mino(self):
-        mino=self.sbr.generate_next()((5,17),0)
+    def new_mino(self,override_next=None):
+        if override_next is not None:
+            minoclass=override_next
+        else:
+            minoclass=self.sbr.generate_next()
+        mino=minoclass((5,17),0)
+
         if self.pf.get_activemino() is not None:
             self.pf.remove_activemino()
         self.pf.add_activemino(mino)
@@ -827,21 +838,25 @@ class TetrisGame:
         return self.pf.get_matrix_state(generate_ghost=True,
                                 include_active=True)
     def get_held(self):
-        pass
+        return self._held_mino
+
     def get_nextqueue(self,n=5):
         return self.sbr.peek(n)
 
+    @classmethod
+    def minoclass_to_r2d(cls,piece_class):
+        piece=piece_class((0,0),0)
+        p2ds=piece.get_blocks()
+        bbx=p2ds.get_boundingbox()
+        positive_p2ds=p2ds.translate(-bbx["X-"],-bbx["Y-"])
+        r2d=Raster2D.blank_fill(4,4,Block(solid=False))
+        r2d=r2d.composite_p2ds(positive_p2ds)
+        return r2d
     def get_nextpreview(self,n):
         res=[]
         pieces=self.get_nextqueue(n)
         for piece_class in pieces:
-            piece=piece_class((0,0),0)
-            p2ds=piece.get_blocks()
-            bbx=p2ds.get_boundingbox()
-            positive_p2ds=p2ds.translate(-bbx["X-"],-bbx["Y-"])
-            r2d=Raster2D.blank_fill(4,4,Block(solid=False))
-            r2d=r2d.composite_p2ds(positive_p2ds)
-            res.append(r2d)
+            res.append(self.minoclass_to_r2d(piece_class))
         return res
 
 
@@ -971,9 +986,11 @@ def main(stdscr):
             tg.key(t,Key.ROTATE_LEFT)
         elif inp=="P":
             tg.key(t,Key.ROTATE_RIGHT)
+        elif inp=="I":
+            tg.key(t,Key.HOLD)
         tg.update(t)
 
-        cys_matrix=cy.subscreen(0,0)
+        cys_matrix=cy.subscreen(8,0)
         r2d=tg.get_matrix_r2d()
         #stdscr.clear()
         def draw_r2d_on_cy(cy,r2d):
@@ -1007,9 +1024,15 @@ def main(stdscr):
         y=0
         for next_r2d in next_r2ds:
 
-            cys_next=cy.subscreen(24,y)
+            cys_next=cy.subscreen(32,y)
             draw_r2d_on_cy(cys_next,next_r2d)
             y+=5
+
+        held=tg.get_held()
+        if held is not None:
+            held_r2d=tg.minoclass_to_r2d(held)
+            draw_r2d_on_cy(
+                cy.subscreen(0,0),held_r2d)
 
 
 
