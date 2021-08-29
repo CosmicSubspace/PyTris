@@ -203,12 +203,13 @@ class CurseYou:
         self._firstdraw=True
 
     def getkey(self):
-        res=None
+        res=[]
         try:
-            res=self._scr.getkey()
+            while True:
+                res.append(self._scr.getkey())
         except:
             pass
-        return res
+        return tuple(res)
 
     def subscreen(self,xdelta,ydelta):
         return CYSub(self,xdelta,ydelta)

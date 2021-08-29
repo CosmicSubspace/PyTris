@@ -902,8 +902,7 @@ _test_DT_cannon_p2ds=Pixel2DSet.from_string(
 _test_DT_cannon_r2d=Raster2D.blank_fill(10,20,Block(solid=False)).composite_p2ds(_test_DT_cannon_p2ds.translate(0,0))
 
 
-class TextOutOfBounds(BaseException):
-    pass
+
 
 hex2f=lambda h:tuple([int(h[i*2+1:i*2+3],base=16)/255 for i in range(3)])
 colormap={
@@ -934,25 +933,24 @@ with curseyou.CurseYouEnviornment(use_256color=True) as cy:
         else:
             time.sleep(waittime)
 
-        inp=cy.getkey()
-        if inp is not None:
+        for inp in cy.getkey():
             inp=inp.upper()
 
+            if inp=="A":
+                tg.key(t,Key.MOVE_LEFT)
+            elif inp=="D":
+                tg.key(t,Key.MOVE_RIGHT)
+            elif inp=="W":
+                tg.key(t,Key.DROP_HARD)
+            elif inp=="S":
+                tg.key(t,Key.DROP_FIRM)
+            elif inp=="O":
+                tg.key(t,Key.ROTATE_LEFT)
+            elif inp=="P":
+                tg.key(t,Key.ROTATE_RIGHT)
+            elif inp=="I":
+                tg.key(t,Key.HOLD)
 
-        if inp=="A":
-            tg.key(t,Key.MOVE_LEFT)
-        elif inp=="D":
-            tg.key(t,Key.MOVE_RIGHT)
-        elif inp=="W":
-            tg.key(t,Key.DROP_HARD)
-        elif inp=="S":
-            tg.key(t,Key.DROP_FIRM)
-        elif inp=="O":
-            tg.key(t,Key.ROTATE_LEFT)
-        elif inp=="P":
-            tg.key(t,Key.ROTATE_RIGHT)
-        elif inp=="I":
-            tg.key(t,Key.HOLD)
         tg.update(t)
 
         cys_matrix=cy.subscreen(10,0)
