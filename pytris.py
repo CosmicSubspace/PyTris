@@ -905,18 +905,18 @@ _test_DT_cannon_r2d=Raster2D.blank_fill(10,20,Block(solid=False)).composite_p2ds
 class TextOutOfBounds(BaseException):
     pass
 
-
+hex2f=lambda h:tuple([int(h[i*2+1:i*2+3],base=16)/255 for i in range(3)])
 colormap={
-    "S":(0.3,1.0,0.3),
-    "Z":(1.0,0.1,0.1),
-    "T":(0.5,0.0,1.0),
-    "O":(1.0,1.0,0.4),
-    "I":(0.0,0.7,1.0),
-    "J":(0.3,0.3,1.0),
-    "L":(0.7,0.7,0.0),
-    "X":(1,1,1)
+    "S":hex2f("#3beb41"),
+    "Z":hex2f("#f0483c"),
+    "T":hex2f("#bc5bf0"),
+    "O":hex2f("#fffa78"),
+    "I":hex2f("#29f2ec"),
+    "J":hex2f("#181eba"),
+    "L":hex2f("#de9f00"),
+    "X":hex2f("#FFFFFF")
     }
-with curseyou.CurseYouEnviornment() as cy:
+with curseyou.CurseYouEnviornment(use_256color=True) as cy:
 
     tg=TetrisGame(time.time())
 
