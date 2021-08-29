@@ -7,8 +7,9 @@ Thin-ish wrapper around the curses module
 class CurseYouEnviornment:
     def __init__(self, use_256color=False,fallback=False):
         self._stdscr=None
-
         self._256c=use_256color
+        self._fallback=fallback
+
     def __enter__(self):
         stdscr=curses.initscr()
         self._stdscr=stdscr
@@ -17,8 +18,11 @@ class CurseYouEnviornment:
         stdscr.keypad(True)
         curses.start_color()
         stdscr.nodelay(True)
-        if curses.COLORS<256:
-            self._256c=False
+        if self._256c and curses.COLORS<256:
+            if self._fallback:
+                self._256c=False
+            else:
+                raise RuntimeError("256 colors not supported!")
         return CurseYou(stdscr,use_256=self._256c)
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -28,24 +32,6 @@ class CurseYouEnviornment:
         curses.nocbreak()
         curses.endwin()
 
-def _rgb_f_to_1000(rgb):
-    assert len(rgb)==3
-    return tuple([round(f*1000) for f in rgb])
-def _rgb_1000_to_f(rgb1000):
-    assert len(rgb1000)==3
-    return tuple([i/1000 for i in rgb1000])
-
-def _find_closest_color(rgb1000):
-    mindist=None
-    candidate=0
-    for c in range(curses.COLORS):
-        cand1000=curses.color_content(c)
-        diff=[(rgb1000[i]-cand1000[i]) for i in range(3)]
-        dist=math.sqrt(sum([i*i for i in diff]))
-        if (mindist is None) or (dist<mindist):
-            mindist=dist
-            candidate=c
-    return candidate
 
 def _256c_to_rgb(n):
     assert 16<=n<=231
@@ -65,6 +51,8 @@ def _rgb_to_256c(r,g,b):
     assert 16<=res<=231
     return res
 
+class TextOutOfBounds(BaseException):
+    pass
 class CurseYou:
     '''
     Thin wrapper around curses module...
@@ -73,22 +61,12 @@ class CurseYou:
         self._colorpairs={}
         self._colorpair_next_index=1
         self._scr=scr
-        self._color_lookup_cache={}
-        self._erase_pending=True
+        self._firstdraw=True
+
         if use_256 and curses.COLORS<256:
             raise RuntimeError("Terminal does not support 256colors!")
         self._256c=use_256
-    def rgb_to_colornum(self,rgb):
-        assert self._256c
-        if rgb not in self._color_lookup_cache:
-            closest=_rgb_to_256c(*rgb)
-            self._color_lookup_cache[rgb]=closest
-        return self._color_lookup_cache[rgb]
-    def check_numcolors(self):
-        cdefs=[]
-        for i in range(curses.COLORS):
-            cdefs.append(curses.color_content(i))
-        return len(set(cdefs))
+
     def _color_to_colornum(self,c):
         if type(c)==int:
             if not (0<=c<curses.COLORS):
@@ -101,26 +79,27 @@ class CurseYou:
                 raise ValueError("Invalid RGB color: "+str(c))
             if max(c)>1 or min(c)<0:
                 raise ValueError("Each color component must be in range 0~1: "+str(c))
-            return self.rgb_to_colornum(c)
+            return _rgb_to_256c(*c)
         else:
             raise ValueError("Invalid color: "+str(c))
 
     def add(self,x,y,s,*,
             fg=curses.COLOR_WHITE,bg=curses.COLOR_BLACK,
             attrs=()):
+
+        if self._firstdraw:
+            self._scr.erase()
+            curses.update_lines_cols()
+            self._firstdraw=False
+
         xmax=curses.COLS-1
         ymax=curses.LINES-1
         if x<0 or (x+len(s))>xmax or y<0 or y>ymax:
             raise TextOutOfBounds
 
-        if self._erase_pending:
-            self._scr.erase()
-            self._erase_pending=False
-
         fg_colornum=self._color_to_colornum(fg)
         bg_colornum=self._color_to_colornum(bg)
 
-        assert 0<=fg_colornum<256
         colorpair=(fg_colornum,bg_colornum)
         if colorpair not in self._colorpairs:
             curses.init_pair(self._colorpair_next_index, *colorpair)
@@ -130,20 +109,24 @@ class CurseYou:
         attr_bitfield=curses.color_pair(self._colorpairs[colorpair])
         for attr in attrs:
             attr_bitfield=attr_bitfield | attr
+
         self._scr.addstr(y,x,s,attr_bitfield)
-    def commit(self,erase=True):
+
+    def commit(self):
         self._scr.refresh()
-        if erase:
-            self._erase_pending=True
+        self._firstdraw=True
+
     def getkey(self):
         res=None
         try:
-            res= self._scr.getkey()
+            res=self._scr.getkey()
         except:
             pass
         return res
+
     def subscreen(self,xdelta,ydelta):
         return CYSub(self,xdelta,ydelta)
+
 
 class CYSub():
     def __init__(self,cy,xoff,yoff):
@@ -161,6 +144,7 @@ class CYSub():
                      self._xoff+xdelta,
                      self._yoff+ydelta)
 
+
 if __name__=="__main__":
     import time
     with CurseYouEnviornment(use_256color=True) as cy:
@@ -168,8 +152,6 @@ if __name__=="__main__":
         for i in range(20):
             cy.add(0,0,
                 "keypress:"+str(cy.getkey()))
-            cy.add(20,0,
-                "NC:"+str(cy.check_numcolors()))
 
             cys=cy.subscreen(0,i%10+1)
             cys.add(i,0,"RAINBOW!",
