@@ -5,6 +5,9 @@ import curses
 import time
 import math
 
+
+import curseyou
+
 class Tuples:
     @classmethod
     def sub(cls,a,b):
@@ -902,87 +905,6 @@ _test_DT_cannon_r2d=Raster2D.blank_fill(10,20,Block(solid=False)).composite_p2ds
 class TextOutOfBounds(BaseException):
     pass
 
-class CurseYou:
-    '''
-    Thin wrapper around curses module...
-    '''
-    def __init__(self,scr):
-        self._colorpairs={}
-        self._colorpair_next_index=1
-        self._scr=scr
-        self._colordefs={}
-        self._colordef_next_index=48
-    @classmethod
-    def rgb_f_to_1000(cls,rgb):
-        assert len(rgb)==3
-        return tuple([round(f*1000) for f in rgb])
-    @classmethod
-    def rgb_1000_to_f(cls,rgb1000):
-        assert len(rgb1000)==3
-        return tuple([i/1000 for i in rgb1000])
-    def rgb_to_colornum(self,rgb):
-        rgb1000=self.rgb_f_to_1000(rgb)
-        if rgb1000 not in self._colordefs:
-            #print(curses.COLORS)
-            #print(self._colordef_next_index,rgb1000)
-            mindist=10000
-            candidate=0
-            for c in range(curses.COLORS):
-                cand1000=curses.color_content(c)
-                candf=self.rgb_1000_to_f(cand1000)
-                dist=Tuples.mag(Tuples.sub(rgb,candf))
-                if dist<mindist:
-                    mindist=dist
-                    candidate=c
-            self._colordefs[rgb1000]=candidate
-            #nvm
-            #curses.init_color(self._colordef_next_index,
-            #                  *rgb1000)
-            #self._colordefs[rgb1000]=self._colordef_next_index
-            #self._colordef_next_index+=1
-        return self._colordefs[rgb1000]
-
-    def add(self,x,y,s,fg,bg,*attrs,rgbcolor=False):
-        xmax=curses.COLS-1
-        ymax=curses.LINES-1
-        if x<0 or x>xmax or y<0 or y>ymax:
-            raise TextOutOfBounds
-
-        if rgbcolor:
-            fg_colornum=self.rgb_to_colornum(fg)
-            bg_colornum=self.rgb_to_colornum(bg)
-
-        else:
-            fg_colornum=fg
-            bg_colornum=bg
-        colorpair=(fg_colornum,bg_colornum)
-        if colorpair not in self._colorpairs:
-            curses.init_pair(self._colorpair_next_index, *colorpair)
-            self._colorpairs[colorpair]=self._colorpair_next_index
-            self._colorpair_next_index+=1
-
-        attr_bitfield=curses.color_pair(self._colorpairs[colorpair])
-        for attr in attrs:
-            attr_bitfield=attr_bitfield | attr
-        self._scr.addstr(y,x,s,attr_bitfield)
-    def commit(self):
-        self._scr.refresh()
-    def getkey():
-        pass
-    def subscreen(self,xdelta,ydelta):
-        return CYSub(self,xdelta,ydelta)
-class CYSub():
-    def __init__(self,cy,xoff,yoff):
-        self._cy=cy
-        self._xoff=xoff
-        self._yoff=yoff
-    def add(self,x,y,*args,**kwargs):
-        self._cy.add(
-            x+self._xoff,
-            y+self._yoff,
-            *args,**kwargs
-            )
-
 
 colormap={
     "S":(0.3,1.0,0.3),
@@ -994,9 +916,7 @@ colormap={
     "L":(0.7,0.7,0.0),
     "X":(1,1,1)
     }
-def main(stdscr):
-    stdscr.nodelay(True)
-    cy=CurseYou(stdscr)
+with curseyou.CurseYouEnviornment() as cy:
 
     tg=TetrisGame(time.time())
 
@@ -1014,10 +934,9 @@ def main(stdscr):
         else:
             time.sleep(waittime)
 
-        try:
-            inp=stdscr.getkey().upper()
-        except:
-            inp=None
+        inp=cy.getkey()
+        if inp is not None:
+            inp=inp.upper()
 
 
         if inp=="A":
@@ -1050,28 +969,25 @@ def main(stdscr):
                     if block.ghost:
                         cy.add(x*2,r2d.y-y,
                             "\u2592"*2,
-                            color,(0,0,0),
-                            rgbcolor=True
+                            fg=color
                             )
                     else:
                         cy.add(x*2,r2d.y-y,
                             "\u2588"*2, # █
-                            color,(0,0,0),
-                            rgbcolor=True
+                            fg=color
                             )
                 else:
                     cy.add(x*2,r2d.y-y,
                         " "*2,
-                        (0,0,0),(0,0,0),
-                        rgbcolor=True
+                        fg=curses.COLOR_BLACK
                         )
         draw_r2d_on_cy(cys_matrix,r2d)
 
         for y in range(21):
             for x in (-1,20):
                 cys_matrix.add(x,y,"|",
-                           curses.COLOR_WHITE,
-                           curses.COLOR_BLACK)
+                           fg=curses.COLOR_WHITE,
+                           bg=curses.COLOR_BLACK)
 
         next_r2ds=tg.get_nextpreview(4)
         y=0
@@ -1095,10 +1011,6 @@ def main(stdscr):
 
         cy.commit()
 
-
-
-if __name__=="__main__":
-    curses.wrapper(main)
 
 
 
