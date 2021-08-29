@@ -53,10 +53,90 @@ def _rgb_to_256c(r,g,b):
 
 class TextOutOfBounds(BaseException):
     pass
+class CYStyle:
+    WHITE   = curses.COLOR_WHITE
+    BLACK   = curses.COLOR_BLACK
+    BLUE    = curses.COLOR_BLUE
+    CYAN    = curses.COLOR_CYAN
+    GREEN   = curses.COLOR_GREEN
+    MAGENTA = curses.COLOR_MAGENTA
+    RED     = curses.COLOR_RED
+    YELLOW  = curses.COLOR_YELLOW
+
+    def __init__(self,*,
+                 fg=curses.COLOR_WHITE,
+                 bg=curses.COLOR_BLACK,
+                 bold=False,
+                 dim=False,
+                 blink=False,
+                 attrs=()):
+        self._fg=fg
+        self._bg=bg
+        self._attrs=set(attrs)
+
+        self.bold=bold
+        self.dim=dim
+        self.blink=blink
+
+    @property
+    def fg(self):
+        return self._fg
+    @fg.setter
+    def fg(self,v):
+        self._fg=v
+
+    @property
+    def bg(self):
+        return self._bg
+    @bg.setter
+    def bg(self,v):
+        self._bg=v
+
+    @property
+    def attrs(self):
+        return tuple(self._attrs)
+
+    @classmethod
+    def _check_bool(cls,b):
+        if type(b) != bool:
+            raise ValueError("Must be boolean! (got "+str(type(b))+")")
+
+    def _set_attr(self,b,target,exclusives=()):
+        self._check_bool(b)
+        if b:
+            self._attrs.add(target)
+            for x in exclusives:
+                if x in self._attrs:
+                    self._attrs.remove(x)
+        else:
+            if target in self._attrs:
+                self._attrs.remove(target)
+
+    @property
+    def bold(self):
+        return curses.A_BOLD in self._attrs
+    @bold.setter
+    def bold(self,b):
+        self._set_attr(b,curses.A_BOLD,(curses.A_DIM,))
+
+    @property
+    def dim(self):
+        return curses.A_DIM in self._attrs
+    @dim.setter
+    def dim(self,b):
+        self._set_attr(b,curses.A_DIM,(curses.A_BOLD,))
+
+    @property
+    def blink(self):
+        return curses.A_BLINK in self._attrs
+    @blink.setter
+    def blink(self,b):
+        self._set_attr(b,curses.A_BLINK)
+
+
+
+
 class CurseYou:
-    '''
-    Thin wrapper around curses module...
-    '''
     def __init__(self,scr,*,use_256=False):
         self._colorpairs={}
         self._colorpair_next_index=1
@@ -85,7 +165,8 @@ class CurseYou:
 
     def add(self,x,y,s,*,
             fg=curses.COLOR_WHITE,bg=curses.COLOR_BLACK,
-            attrs=()):
+            attrs=(),
+            style=None):
 
         if self._firstdraw:
             self._scr.erase()
@@ -96,6 +177,11 @@ class CurseYou:
         ymax=curses.LINES-1
         if x<0 or (x+len(s))>xmax or y<0 or y>ymax:
             raise TextOutOfBounds
+
+        if style is not None:
+            fg=style.fg
+            bg=style.bg
+            attrs=style.attrs
 
         fg_colornum=self._color_to_colornum(fg)
         bg_colornum=self._color_to_colornum(bg)
@@ -151,7 +237,8 @@ if __name__=="__main__":
         r,g,b=0,0,0
         for i in range(20):
             cy.add(0,0,
-                "keypress:"+str(cy.getkey()))
+                "keypress:"+str(cy.getkey()),
+                style=CYStyle(fg=curses.COLOR_RED,blink=True))
 
             cys=cy.subscreen(0,i%10+1)
             cys.add(i,0,"RAINBOW!",
