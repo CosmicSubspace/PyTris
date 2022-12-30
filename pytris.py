@@ -8,6 +8,7 @@ import math
 
 import curseyou
 
+# Helper functions for dealing with tuples as vectors.
 class Tuples:
     @classmethod
     def sub(cls,a,b):
@@ -915,13 +916,13 @@ colormap={
     "L":hex2f("#de9f00"),
     "X":hex2f("#FFFFFF")
     }
-with curseyou.CurseYouEnviornment(use_256color=True) as cy:
+with curseyou.CurseYouEnvironment(use_256color=True) as cy:
 
     tg=TetrisGame(time.time())
 
     target_fps=20
     target_spf=1/target_fps
-    last_frame_time=0
+    last_frame_time=time.time()
     while True: # UI loop
         t=time.time()
         target_frametime=last_frame_time+target_spf
@@ -932,6 +933,7 @@ with curseyou.CurseYouEnviornment(use_256color=True) as cy:
             time.sleep(target_spf)
         else:
             time.sleep(waittime)
+        last_frame_time=t
 
         for inp in cy.getkey():
             inp=inp.upper()
@@ -953,7 +955,8 @@ with curseyou.CurseYouEnviornment(use_256color=True) as cy:
 
         tg.update(t)
 
-        cys_matrix=cy.subscreen(10,0)
+
+        cys_matrix=cy.subview(10,0)
         r2d=tg.get_matrix_r2d()
         #stdscr.clear()
         def draw_r2d_on_cy(cy,r2d):
@@ -982,8 +985,8 @@ with curseyou.CurseYouEnviornment(use_256color=True) as cy:
         draw_r2d_on_cy(cys_matrix,r2d)
 
         for y in range(21):
-            for x in (-1,20):
-                cys_matrix.add(x,y,"|",
+            for x in (9,30):
+                cy.add(x,y,"|",
                            fg=curses.COLOR_WHITE,
                            bg=curses.COLOR_BLACK)
 
@@ -991,7 +994,7 @@ with curseyou.CurseYouEnviornment(use_256color=True) as cy:
         y=0
         for next_r2d in next_r2ds:
 
-            cys_next=cy.subscreen(34,y)
+            cys_next=cy.subview(34,y)
             draw_r2d_on_cy(cys_next,next_r2d)
             y+=5
 
@@ -999,7 +1002,7 @@ with curseyou.CurseYouEnviornment(use_256color=True) as cy:
         if held is not None:
             held_r2d=tg.minoclass_to_r2d(held)
             draw_r2d_on_cy(
-                cy.subscreen(0,0),held_r2d)
+                cy.subview(0,0),held_r2d)
 
 
 
