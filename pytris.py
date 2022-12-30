@@ -277,6 +277,11 @@ class Tetrimino():
         self._gravity_remainder=0
         self._dead=False
 
+        self._lc=None
+
+    def get_lineclear(self):
+        return self._lc
+
     def link_to_playfield(self,pf):
         self._playfield=pf
 
@@ -367,7 +372,7 @@ class Tetrimino():
             pass
     
     def lock(self):
-        self._playfield.lock_mino(self)
+        self._lc=self._playfield.lock_mino(self)
 
     def hard_drop(self,t):
         self.firm_drop(t)
@@ -721,13 +726,12 @@ class Playfield():
         imm=mino.is_immobile()
         self._matrix=self._matrix.composite_p2ds(mino.get_blocks())
         mino.die()
-        self.remove_mino(mino)
         
         lc=self.check_line_clear()
         if imm:
             lc.activate_spin()
-        if not lc.empty:
-            print(lc)
+
+        return lc
 
     def force_matrix_state(self,r2d):
         self._matrix=r2d
@@ -764,6 +768,8 @@ class TetrisGame:
         self.pf.force_matrix_state(_test_DT_cannon_r2d)
 
         self._last_updated_t=t
+
+        self._clear_history=[]
 
     def set_gravity(self,g):
         self._gravity=g*60 #Blocks per 60fps frame
@@ -808,6 +814,12 @@ class TetrisGame:
                 am.lock()
 
         if am.dead:
+            mino_result=am.get_lineclear()
+            if not mino_result.empty:
+                self._clear_history.append((t,mino_result))
+                while len(self._clear_history)>100:
+                    del self._clear_history[0]
+
             self.new_mino()
             self._hold_avail=True
 
@@ -819,7 +831,11 @@ class TetrisGame:
         if down>0:
             self.pf.get_activemino().gravity(down,t)
 
-
+    def get_last_lc(self):
+        if len(self._clear_history)>0:
+            return self._clear_history[-1]
+        else:
+            return None
 
     def hold(self):
         if not self._hold_avail:
@@ -925,16 +941,19 @@ with curseyou.CurseYouEnvironment(use_256color=True) as cy:
     last_frame_time=time.time()
     while True: # UI loop
         t=time.time()
-        target_frametime=last_frame_time+target_spf
-        waittime=target_frametime-t
-        if waittime<=0:
-            pass
-        elif waittime>target_spf:
-            time.sleep(target_spf)
-        else:
-            time.sleep(waittime)
-        last_frame_time=t
 
+        try:
+            target_frametime=last_frame_time+target_spf
+            waittime=target_frametime-t
+            if waittime<=0:
+                pass
+            elif waittime>target_spf:
+                time.sleep(target_spf)
+            else:
+                time.sleep(waittime)
+            last_frame_time=t
+        except KeyboardInterrupt:
+            break
         for inp in cy.getkey():
             inp=inp.upper()
 
@@ -956,7 +975,7 @@ with curseyou.CurseYouEnvironment(use_256color=True) as cy:
         tg.update(t)
 
 
-        cys_matrix=cy.subview(10,0)
+        sv_matrix=cy.subview(10,0)
         r2d=tg.get_matrix_r2d()
         #stdscr.clear()
         def draw_r2d_on_cy(cy,r2d):
@@ -982,7 +1001,7 @@ with curseyou.CurseYouEnvironment(use_256color=True) as cy:
                         " "*2,
                         fg=curses.COLOR_BLACK
                         )
-        draw_r2d_on_cy(cys_matrix,r2d)
+        draw_r2d_on_cy(sv_matrix,r2d)
 
         for y in range(21):
             for x in (9,30):
@@ -994,8 +1013,8 @@ with curseyou.CurseYouEnvironment(use_256color=True) as cy:
         y=0
         for next_r2d in next_r2ds:
 
-            cys_next=cy.subview(34,y)
-            draw_r2d_on_cy(cys_next,next_r2d)
+            sv_next=cy.subview(34,y)
+            draw_r2d_on_cy(sv_next,next_r2d)
             y+=5
 
         held=tg.get_held()
@@ -1004,8 +1023,26 @@ with curseyou.CurseYouEnvironment(use_256color=True) as cy:
             draw_r2d_on_cy(
                 cy.subview(0,0),held_r2d)
 
+        sv_help=cy.subview(0,15)
+        sv_help.add(0,0,"A Left")
+        sv_help.add(0,1,"D Right")
+        sv_help.add(0,2,"W H.Drop")
+        sv_help.add(0,3,"S S.Drop")
+        sv_help.add(0,4,"P CW")
+        sv_help.add(0,5,"O CCW")
+        sv_help.add(0,6,"I Hold")
 
-
+        last_lc=tg.get_last_lc()
+        sv_score=cy.subview(12,21)
+        lc_style=curseyou.CYStyle(fg=curseyou.CYStyle.WHITE)
+        lc_style_nice=curseyou.CYStyle(fg=curseyou.CYStyle.RED,blink=True,bold=True)
+        if last_lc is not None:
+            if not last_lc[1].empty:
+                if t-last_lc[0]<5:
+                    if (last_lc[1].lines>=4) or (last_lc[1].spin):
+                        sv_score.add(0,0,str(last_lc[1]),style=lc_style_nice)
+                    else:
+                        sv_score.add(0,0,str(last_lc[1]),style=lc_style)
 
 
 
@@ -1013,7 +1050,7 @@ with curseyou.CurseYouEnvironment(use_256color=True) as cy:
         cy.commit()
 
 
-
+print("goodbye")
 
 
 
