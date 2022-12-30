@@ -765,7 +765,7 @@ class TetrisGame:
         self.sbr=SevenBagRandomizer
         self.pf=Playfield(10,20)
 
-        self.pf.force_matrix_state(_test_DT_cannon_r2d)
+        #self.pf.force_matrix_state(_test_DT_cannon_r2d)
 
         self._last_updated_t=t
 
